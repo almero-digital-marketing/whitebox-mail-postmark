@@ -26,6 +26,7 @@ The same contract as the Mailgun provider — only the internals differ:
 | method | Postmark specifics |
 |---|---|
 | `send(msg) → { messageId }` | `ServerClient.sendEmail` (PascalCase fields); `TrackOpens`/`TrackLinks`; base64 attachments; returns `MessageID` |
+| `sendBatch(messages)` + `maxBatchSize: 500` | `sendEmailBatch` — independently-rendered messages, one result per recipient each with its own `MessageID`/error |
 | `verifySignature(req)` | HTTP **Basic auth** (Postmark doesn't HMAC-sign); off if no credentials configured |
 | `parseInbound(req)` | `FromFull`/`Subject`/`StrippedTextReply`/`HtmlBody` + base64 `Attachments` |
 | `parseTracking(req)` | dispatches on `RecordType` (Delivery/Open/Click/Bounce/SpamComplaint/SubscriptionChange) → canonical event; hard bounce ⇒ `permanent` |

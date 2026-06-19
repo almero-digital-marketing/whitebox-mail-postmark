@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock the Postmark SDK so send() never touches the network.
 const sendEmail = vi.fn(async () => ({ MessageID: 'pm-123', ErrorCode: 0 }))
-vi.mock('postmark', () => ({ ServerClient: class { sendEmail = sendEmail } }))
+const sendEmailBatch = vi.fn(async (msgs) => msgs.map((_, i) => ({ MessageID: `pm-${i}`, ErrorCode: 0 })))
+vi.mock('postmark', () => ({ ServerClient: class { sendEmail = sendEmail; sendEmailBatch = sendEmailBatch } }))
 
 const { postmark } = await import('../src/index.js')
 
 const make = (extra = {}) => postmark({ serverToken: 'tok', from: 'sender@x.com', ...extra })
 
-beforeEach(() => sendEmail.mockClear())
+beforeEach(() => { sendEmail.mockClear(); sendEmailBatch.mockClear() })
 
 describe('contract', () => {
   it('exposes the provider methods', () => {
@@ -48,6 +49,41 @@ describe('send', () => {
     expect(arg.From).toBe('me@z.com')
     expect(arg.TrackOpens).toBe(false)
     expect(arg.TrackLinks).toBe('None')
+  })
+})
+
+describe('sendBatch', () => {
+  it('advertises maxBatchSize', () => {
+    expect(make().maxBatchSize).toBe(500)
+  })
+
+  it('sends one sendEmailBatch call and maps a result per recipient (in order)', async () => {
+    const p = make()
+    const out = await p.sendBatch([
+      { to: 'a@b.com', subject: 'Hi', html: '<p>a</p>', track: true },
+      { to: 'c@d.com', subject: 'Hi', html: '<p>c</p>' },
+    ])
+    expect(sendEmailBatch).toHaveBeenCalledTimes(1)
+    const built = sendEmailBatch.mock.calls[0][0]
+    expect(built).toHaveLength(2)
+    expect(built[0]).toMatchObject({ To: 'a@b.com', From: 'sender@x.com', Subject: 'Hi', TrackOpens: true })
+    expect(out).toEqual([{ messageId: 'pm-0', error: null }, { messageId: 'pm-1', error: null }])
+  })
+
+  it('surfaces per-message errors from the batch', async () => {
+    sendEmailBatch.mockResolvedValueOnce([
+      { MessageID: 'ok', ErrorCode: 0 },
+      { ErrorCode: 406, Message: 'inactive recipient' },
+    ])
+    const p = make()
+    const out = await p.sendBatch([
+      { to: 'a@b.com', subject: 'x', text: 'y' },
+      { to: 'bad@b.com', subject: 'x', text: 'y' },
+    ])
+    expect(out).toEqual([
+      { messageId: 'ok', error: null },
+      { messageId: null, error: 'inactive recipient' },
+    ])
   })
 })
 

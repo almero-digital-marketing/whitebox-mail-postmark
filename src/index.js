@@ -51,30 +51,51 @@ export function postmark({ serverToken, from, messageStream = 'outbound', webhoo
     return safeEqual(u, webhookUser || '') && safeEqual(pw, webhookPassword || '')
   }
 
+  async function toPostmarkMessage({ from: msgFrom, to, replyTo, subject, html, text, headers, attachments = [], track = false }) {
+    const Attachments = await Promise.all(attachments.map(async a => ({
+      Name: a.filename,
+      Content: (await readFile(a.path)).toString('base64'),
+      ContentType: contentType(a.filename),
+    })))
+    return {
+      From: msgFrom || from,
+      To: to,
+      ReplyTo: replyTo || undefined,
+      Subject: subject,
+      HtmlBody: html || undefined,
+      TextBody: text || undefined,
+      Headers: headers ? Object.entries(headers).map(([Name, Value]) => ({ Name, Value: String(Value) })) : undefined,
+      Attachments: Attachments.length ? Attachments : undefined,
+      TrackOpens: !!track,
+      TrackLinks: track ? 'HtmlAndText' : 'None',
+      MessageStream: messageStream,
+    }
+  }
+
   return {
     name: 'postmark',
+    // Postmark's sendEmailBatch accepts up to 500 fully-independent messages.
+    maxBatchSize: 500,
 
-    async send({ from: msgFrom, to, replyTo, subject, html, text, headers, attachments = [], track = false }) {
-      const Attachments = await Promise.all(attachments.map(async a => ({
-        Name: a.filename,
-        Content: (await readFile(a.path)).toString('base64'),
-        ContentType: contentType(a.filename),
-      })))
-
-      const resp = await client.sendEmail({
-        From: msgFrom || from,
-        To: to,
-        ReplyTo: replyTo || undefined,
-        Subject: subject,
-        HtmlBody: html || undefined,
-        TextBody: text || undefined,
-        Headers: headers ? Object.entries(headers).map(([Name, Value]) => ({ Name, Value: String(Value) })) : undefined,
-        Attachments: Attachments.length ? Attachments : undefined,
-        TrackOpens: !!track,
-        TrackLinks: track ? 'HtmlAndText' : 'None',
-        MessageStream: messageStream,
-      })
+    async send(msg) {
+      const resp = await client.sendEmail(await toPostmarkMessage(msg))
       return { messageId: resp?.MessageID || null }
+    },
+
+    // Native batch: each message is independent (full per-recipient rendering),
+    // and Postmark returns a result per message — aligned with the input order —
+    // each with its own MessageID / ErrorCode.
+    async sendBatch(messages) {
+      if (!messages.length) return []
+      const built = await Promise.all(messages.map(toPostmarkMessage))
+      const results = await client.sendEmailBatch(built)
+      return messages.map((_, i) => {
+        const r = results[i] || {}
+        return {
+          messageId: r.MessageID || null,
+          error: r.ErrorCode ? (r.Message || `Postmark ErrorCode ${r.ErrorCode}`) : null,
+        }
+      })
     },
 
     // Postmark uses the same Basic-auth check for both webhook kinds.
