@@ -1,6 +1,6 @@
 # whitebox-mail-postmark
 
-[Postmark](https://postmarkapp.com/) provider for [`whitebox-server-plugin-mail`](../../whitebox-server-plugin-mail). Lives in its own repo; the mail plugin stays provider-agnostic and composes this in.
+[Postmark](https://postmarkapp.com/) provider for `whitebox-server-plugin-mail`. Lives in its own repo; the mail plugin stays provider-agnostic and composes this in.
 
 ```js
 import { mail } from 'whitebox-server-plugin-mail'
@@ -33,12 +33,32 @@ The same contract as the Mailgun provider — only the internals differ:
 
 > Postmark has no `event_id`-style pixel↔API dedup concern here — there's no browser pixel; the plugin records a single first-party send + tracking events.
 
-## Webhooks
+## Webhook setup
 
-Postmark posts JSON. Configure these webhook URLs (set the same Basic-auth user/password you passed to `postmark({ … })`):
+Postmark posts JSON and secures webhooks with **HTTP Basic auth** on the URL (it doesn't HMAC-sign). Set a username/password and pass the *same* pair to `postmark({ webhookUser, webhookPassword })` — the plugin rejects any request whose `Authorization: Basic …` header doesn't match.
 
-- inbound → `POST /mail/webhooks/inbox`
-- delivery / open / click / bounce / spam-complaint / subscription-change → `POST /mail/webhooks/tracking`
+> If you leave `webhookUser`/`webhookPassword` unset, this provider does **not** verify webhooks (open endpoint). Either set them, or secure the route another way (secret path, network policy).
+
+**1. Sender Signature.** Postmark → **Sender Signatures** — verify the address you'll send from and put it in `WB_POSTMARK_FROM`. Postmark refuses to send from an unverified signature/domain.
+
+**2. Tracking events.** Postmark → your **Message Stream → Webhooks → Add webhook**:
+- URL — `https://USER:PASSWORD@YOUR_HOST/mail/webhooks/tracking` (Basic-auth creds in the URL), matching `webhookUser`/`webhookPassword`.
+- Tick the event types you want; each posts a distinct `RecordType`:
+
+| Postmark RecordType | canonical | effect in WhiteBox |
+|---|---|---|
+| Delivery | `delivered` | outbox status → delivered |
+| Open | `opened` | → opened, recorded in awareness |
+| Click | `clicked` | → engaged, recorded in awareness |
+| Bounce (`Inactive`/`HardBounce`) | `bounced` (permanent) | → **invalid** list |
+| SpamComplaint | `complained` | → **suppression** list |
+| SubscriptionChange (`SuppressSending`) | `unsubscribed` | → **suppression** list |
+
+Opens/clicks require **Open Tracking / Link Tracking** enabled on the stream (the plugin also sends `TrackOpens`/`TrackLinks` per message).
+
+**3. Inbound mail / replies.** Postmark → the **Inbound** stream → set its **Inbound Webhook** URL to `https://USER:PASSWORD@YOUR_HOST/mail/webhooks/inbox`. Postmark gives the stream an inbound address (a hash@inbound.postmarkapp.com, or your own MX-pointed domain) — mail to it is POSTed as JSON, attachments base64-encoded.
+
+Full URLs are under the mail plugin's `/mail` mount: `…/mail/webhooks/tracking` and `…/mail/webhooks/inbox`.
 
 ## Credentials
 
