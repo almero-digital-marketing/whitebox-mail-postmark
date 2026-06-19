@@ -3,8 +3,8 @@ import { readFile } from 'fs/promises'
 import path from 'path'
 import { ServerClient } from 'postmark'
 
-// Postmark provider for whitebox-server-plugin-mail. Implements the same neutral
-// provider contract as whitebox-mail-mailgun, so the plugin code is identical —
+// Postmark provider for whitebox-pro-server-plugin-mail. Implements the same neutral
+// provider contract as whitebox-pro-mail-mailgun, so the plugin code is identical —
 // only the SDK, webhook auth (Postmark uses HTTP Basic auth, not HMAC), and the
 // JSON payload shapes differ. Compose: mail({ provider: postmark({ … }) }).
 

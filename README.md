@@ -1,10 +1,10 @@
-# whitebox-mail-postmark
+# whitebox-pro-mail-postmark
 
-[Postmark](https://postmarkapp.com/) provider for `whitebox-server-plugin-mail`. Lives in its own repo; the mail plugin stays provider-agnostic and composes this in.
+[Postmark](https://postmarkapp.com/) provider for `whitebox-pro-server-plugin-mail`. Lives in its own repo; the mail plugin stays provider-agnostic and composes this in.
 
 ```js
-import { mail } from 'whitebox-server-plugin-mail'
-import { postmark } from 'whitebox-mail-postmark'
+import { mail } from 'whitebox-pro-server-plugin-mail'
+import { postmark } from 'whitebox-pro-mail-postmark'
 
 mail({
   provider: postmark({

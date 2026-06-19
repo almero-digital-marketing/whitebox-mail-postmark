@@ -1,11 +1,11 @@
 {
-  "name": "whitebox-mail-postmark",
+  "name": "whitebox-pro-mail-postmark",
   "version": "0.1.0",
-  "description": "Postmark provider for whitebox-server-plugin-mail — send (Postmark SDK), inbound + tracking webhook parsing, Basic-auth webhook verification.",
+  "description": "Postmark provider for whitebox-pro-server-plugin-mail — send (Postmark SDK), inbound + tracking webhook parsing, Basic-auth webhook verification.",
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/almero-digital-marketing/whitebox-mail-postmark.git"
+    "url": "git+https://github.com/almero-digital-marketing/whitebox-pro-mail-postmark.git"
   },
   "type": "module",
   "main": "src/index.js",
@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "whitebox-server-plugin-mail": "^0.1.0"
+    "whitebox-pro-server-plugin-mail": "^0.1.0"
   },
   "dependencies": {
     "postmark": "^4.0.5"
